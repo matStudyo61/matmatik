@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MATMATİK – Çarpmayı Sevdiren Oyun</title>
+
+<style>
+:root{
+  --bg2:#bfcdde; --bg3:#2c0b22;
+  --cyan:#95ffd8;
+  --p1:#1e40ff;
+  --p2:#7a0a0a;
+  --cellBase:#e7e7e7;
+}
+
+*{ box-sizing:border-box; }
+
+html, body{
+  height:100%;
+  min-height:100%;
+  background:#000;         /* WebView beyaz boşluk göstermesin */
+}
+
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color:#eaf2ff;
+
+  min-height:100vh;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+
+  /* Edge-to-edge + çentik için güvenli boşluk */
+  padding:
+    calc(10px + env(safe-area-inset-top))
+    10px
+    calc(10px + env(safe-area-inset-bottom))
+    10px;
+
+  overflow-x:hidden;
+
+  background:
+    radial-gradient(circle at 50% 45%, var(--bg2) 0%, rgba(191,205,222,.85) 18%, rgba(0,0,0,.85) 45%, var(--bg3) 75%),
+    radial-gradient(circle at 30% 25%, rgba(255,255,255,.08), rgba(0,0,0,0) 45%),
+    #000;
+}
+
+/* =========================
+   MOBİL / TABLET (varsayılan)
+   ========================= */
+.wrap{
+  width:min(720px, 100%);
+  display:grid;
+  gap:10px;
+
+  /* ✅ title alanını EKLEDİK (asıl hata buydu) */
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "title title"
+    "p1    p2"
+    "game  game";
+
+  align-items:start;
+
+  /* ekranı doldursun */
+  min-height: calc(100vh - 20px);
+}
+
+.titleWrap{ grid-area:title; }
+.left{ grid-area:p1; }
+.right{ grid-area:p2; }
+#gameRoot{ grid-area:game; }
+
+/* Başlık: mobilde görünür */
+.titleWrap{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.title{
+  display:block;
+  width:100%;
+  text-align:center;
+  font-weight:900;
+  letter-spacing:2px;
+  color: var(--cyan);
+  text-shadow: 0 6px 25px rgba(0,0,0,.35);
+  font-size: 28px;
+  margin: 6px 0 2px 0;
+}
+
+/* Oyuncu paneli: ince yatay bar */
+.side{
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.22));
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+  padding:8px 10px;
+  margin:0;
+  box-shadow: 0 14px 28px rgba(0,0,0,.32);
+  backdrop-filter: blur(6px);
+
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-height:44px;
+}
+
+.side h2{
+  margin:0;
+  font-size:16px;
+  font-weight:900;
+  letter-spacing:.4px;
+  white-space:nowrap;
+  text-shadow: 0 6px 16px rgba(0,0,0,.35);
+}
+
+/* Badge */
+.badge{
+  width:28px; height:28px;
+  border-radius:8px;
+  position:relative;
+  box-shadow:
+    inset 0 0 0 3px rgba(0,0,0,.18),
+    0 10px 18px rgba(0,0,0,.28);
+  overflow:hidden;
+  flex:0 0 auto;
+}
+.badge::after{
+  content:"";
+  position:absolute; inset:0;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.35), rgba(255,255,255,0) 55%);
+  pointer-events:none;
+}
+.badge.p1{background: linear-gradient(135deg, rgba(46,98,255,1), rgba(10,44,255,1));}
+.badge.p2{background: linear-gradient(135deg, rgba(160,18,18,1), rgba(122,10,10,1));}
+
+.trophyInBadge{
+  position:absolute; inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+  line-height:1;
+  opacity:0;
+  transform: scale(.90);
+  transition: opacity .25s ease, transform .25s ease;
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.5));
+}
+.badge.win .trophyInBadge{ opacity:1; transform: scale(1.02); }
+
+.turnStar{
+  font-size:20px;
+  line-height:1;
+  filter: drop-shadow(0 8px 14px rgba(0,0,0,.5));
+  opacity:.18;
+  flex:0 0 auto;
+}
+.turnStar.on{ opacity:1; }
+
+/* Oyun merkezi */
+.center{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+}
+
+/* Tahta */
+.board{
+  width:100%;
+  background: rgba(255,255,255,.08);
+  border-radius:18px;
+  padding:10px;
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow: 0 18px 40px rgba(0,0,0,.28);
+}
+.grid{
+  display:grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap:8px;
+  background: rgba(0,0,0,.16);
+  padding:8px;
+  border-radius:14px;
+}
+
+.cell{
+  background: linear-gradient(180deg, rgba(255,255,255,.96), var(--cellBase));
+  color:#0b1020;
+  font-weight:900;
+  border:1px solid rgba(0,0,0,.10);
+  border-top-color: rgba(255,255,255,.35);
+  border-left-color: rgba(255,255,255,.25);
+  border-radius:10px;
+  user-select:none;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  aspect-ratio: 1 / 1;
+  font-size: clamp(18px, 4.6vw, 26px);
+  box-shadow: 0 10px 18px rgba(0,0,0,.18);
+}
+.cell.p1{
+  background: linear-gradient(135deg, rgba(46,98,255,1), rgba(10,44,255,1));
+  color:#fff;
+  border-color: rgba(0,0,0,.18);
+}
+.cell.p2{
+  background: linear-gradient(135deg, rgba(160,18,18,1), rgba(122,10,10,1));
+  color:#fff;
+  border-color: rgba(0,0,0,.18);
+}
+
+/* Çarpan alanı */
+.factors{
+  width:100%;
+  background: rgba(0,0,0,.18);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:18px;
+  padding:12px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.22);
+  backdrop-filter: blur(4px);
+}
+
+/* Butonlar HUD üstü */
+.btns{
+  order:-1;
+  display:flex;
+  gap:8px;
+  justify-content:center;
+  margin: 0 0 8px 0;
+  flex-wrap:wrap;
+}
+button.action{
+  border:0;
+  border-radius:14px;
+  padding:10px 14px;
+  font-weight:900;
+  font-size:14px;
+  cursor:pointer;
+  background: linear-gradient(135deg, #2f62ff, #7aa7ff);
+  color:#071022;
+  box-shadow: 0 12px 22px rgba(0,0,0,.25);
+}
+button.action.secondary{
+  background: rgba(13,21,42,.90);
+  border:1px solid rgba(255,255,255,.16);
+  color:#eaf2ff;
+  font-weight:900;
+  padding:10px 14px;
+  font-size:14px;
+}
+
+@media (max-width: 480px){
+  button.action,
+  button.action.secondary{
+    padding:9px 12px;
+    font-size:13px;
+  }
+}
+
+/* HUD */
+.hud{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  flex-wrap:nowrap;
+  font-weight:900;
+  color:#dbe7ff;
+  margin-bottom:8px;
+}
+.pill{
+  background: rgba(0,0,0,.28);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:999px;
+  padding:6px 10px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+  white-space:nowrap;
+  font-size:13px;
+}
+
+/* Hint */
+.hintBar{
+  width:100%;
+  background: rgba(0,0,0,.22);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+  padding:6px 10px;
+  margin: 2px 0 10px;
+  text-align:center;
+  font-weight:900;
+  color:#fff3c4;
+  text-shadow: 0 6px 18px rgba(0,0,0,.5);
+  min-height: 32px;
+  font-size:12px;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Çarpan satırlarını ayır */
+.factorRow{
+  display:grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap:8px;
+  justify-content:center;
+  margin:10px 0;
+  overflow:hidden;
+
+  background: rgba(0,0,0,.12);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  padding: 16px 3px 3px 3px;
+  position: relative;
+}
+.factorRow::before{
+  content: attr(data-label);
+  position:absolute;
+  top:-1px;
+  left:6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(0,0,0,.55);
+  border: 0px;
+  color: rgba(233,242,255,.92);
+}
+
+.circle{
+  width:100%;
+  aspect-ratio: 1 / 1;
+  border-radius:999px;
+  background: rgba(149,255,216,.92);
+  border:2px solid rgba(0,0,0,.75);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:900;
+  font-size:14px;
+  color:#000;
+  cursor:pointer;
+  user-select:none;
+  box-shadow: 0 10px 18px rgba(0,0,0,.28);
+}
+.circle.sel{
+  background:#ffe600;
+  border-color: rgba(0,0,0,.9);
+  transform: scale(1.05);
+}
+
+.locked .circle{ pointer-events:none; opacity:.6; }
+
+/* Overlay / modal */
+.overlay{
+  position:fixed;
+  inset:0;
+  background: rgba(0,0,0,.60);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  z-index:9999;
+}
+.overlay.show{ display:flex; }
+
+.modal{
+  width:min(820px, 100%);
+  background: rgba(10,16,32,.92);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:22px;
+  box-shadow: 0 30px 70px rgba(0,0,0,.55);
+  padding:18px 18px 16px;
+  backdrop-filter: blur(10px);
+}
+.modal h3{
+  margin:0 0 12px;
+  font-size:24px;
+  letter-spacing:.4px;
+  color: var(--cyan);
+  text-shadow: 0 8px 18px rgba(0,0,0,.45);
+}
+.modal p{
+  margin:14px 0;
+  font-size:18px;
+  line-height:1.35;
+  font-weight:900;
+  color:#eaf2ff;
+}
+.modal .note{
+  font-size:15px;
+  font-weight:800;
+  opacity:.88;
+}
+.modal .closeRow{
+  display:flex;
+  justify-content:center;
+  margin-top:14px;
+}
+.modal .closeBtn{
+  font-size:18px;
+  padding:14px 18px;
+  border-radius:16px;
+}
+
+/* Çok dar ekran */
+@media (max-width: 360px){
+  .pill{ font-size:12px; padding:6px 9px; }
+  .circle{ font-size:13px; }
+  .grid{ gap:7px; }
+}
+        
+@media (max-width: 979px){
+  html, body{
+    background: #000 !important;
+  }
+
+  body{
+    background: #000 !important; /* radial-gradientleri ezer */
+  }
+}
+
+/* =========================
+   MASAÜSTÜ (980px+)
+   ========================= */
+@media (min-width: 980px){
+  body{
+    align-items:center;
+    padding:16px;
+  }
+
+  .wrap{
+    width:min(1200px, 100%);
+    grid-template-columns: 280px 1fr 280px;
+    grid-template-areas:
+      "title title title"
+      "p1    game  p2";
+    gap:14px;
+  }
+
+  .titleWrap{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    grid-column: 1 / -1;
+  }
+
+  .title{
+    font-size: clamp(28px, 4vw, 48px);
+    margin:2px 0 8px 0;
+  }
+
+  .side{
+    flex-direction:column;
+    justify-content:flex-start;
+    gap:10px;
+    padding:14px 14px 16px;
+    border-radius:18px;
+    min-height:auto;
+    margin-top:58px;
+  }
+  .side h2{ font-size:26px; letter-spacing:.6px; }
+
+  .badge{ width:74px; height:74px; border-radius:14px; }
+  .trophyInBadge{ font-size:44px; }
+  .turnStar{ font-size:54px; transform: translateY(-2px); }
+
+  .board{ width:auto; }
+  .grid{
+    grid-template-columns: repeat(6, minmax(54px, 74px));
+    gap:6px;
+    padding:8px;
+  }
+  .cell{
+    aspect-ratio:auto;
+    min-height:64px;
+    font-size: clamp(22px, 2.2vw, 36px);
+  }
+
+  .factors{ width:min(780px, 100%); }
+
+  .hud{ justify-content:center; gap:10px; }
+  .pill{ font-size:inherit; padding:9px 12px; }
+
+  .hintBar{
+    min-height:44px;
+    padding:10px 12px;
+    font-size:inherit;
+    white-space:normal;
+    overflow:visible;
+    text-overflow:clip;
+  }
+
+  .factorRow{
+    grid-template-columns: repeat(9, 58px);
+    gap:10px;
+    overflow-x:auto;
+    justify-content:center;
+    padding: 16px 3px 3px 3px;
+  }
+  .circle{
+    width:58px;
+    height:58px;
+    aspect-ratio:auto;
+    font-size:24px;
+    border-width:3px;
+  }
+}
+
+/* ===== OYUN BİTTİ OVERLAY ===== */
+.gameOverOverlay{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  z-index:10000;
+  background: rgba(0,0,0,.50); /* saydam perde */
+  backdrop-filter: blur(3px);
+}
+.gameOverOverlay.show{ display:flex; }
+
+.gameOverModal{
+  width:min(520px, 92vw);
+  background: rgba(12, 16, 28, .78); /* saydam panel */
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:22px;
+  box-shadow: 0 30px 70px rgba(0,0,0,.55);
+  padding:18px 18px 16px;
+  text-align:center;
+}
+
+.gameOverTitle{
+  font-weight: 1000;
+  letter-spacing: .4px;
+  margin: 0 0 8px 0;
+  font-size: 24px;
+}
+
+.gameOverWinner{
+  margin: 4px 0 8px 0;
+  font-weight: 900;
+  font-size: 20px;
+  color: #eaf2ff;
+}
+
+.bigTrophy{
+  font-size: 72px; /* büyük kupa */
+  line-height: 1;
+  margin: 8px 0 10px 0;
+  filter: drop-shadow(0 12px 18px rgba(0,0,0,.45));
+}
+
+.gameOverQuestion{
+  margin-top: 10px;
+  font-weight: 900;
+  color: rgba(233,242,255,.92);
+}
+
+.gameOverBtns{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+  margin-top: 12px;
+}
+
+button.action.ghost{
+  background: rgba(13,21,42,.75);
+  border:1px solid rgba(255,255,255,.16);
+  color:#eaf2ff;
+}
+
+button.action.danger{
+  background: linear-gradient(135deg, #ff4b4b, #ff9b9b);
+  color:#1a0a0a;
+}
+
+
+
+/* ===== ÇARPAN SEÇİM ONAYI (YANLIŞ DOKUNMAYA KARŞI) ===== */
+.factorPickOverlay{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  z-index:11000;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(3px);
+}
+.factorPickOverlay.show{ display:flex; }
+
+.factorPickModal{
+  width:min(520px, 92vw);
+  background: rgba(12, 16, 28, .78);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:22px;
+  box-shadow: 0 30px 70px rgba(0,0,0,.55);
+  padding:18px 18px 16px;
+  text-align:center;
+}
+
+.factorPickTitle{
+  font-weight: 1000;
+  letter-spacing: .3px;
+  margin: 0 0 10px 0;
+  font-size: 22px;
+}
+
+.factorBubble{
+  width:88px;
+  height:88px;
+  border-radius:999px;
+  margin: 8px auto 10px auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:1000;
+  font-size:34px;
+  color:#000;
+  background:#ffe600;
+  border:3px solid rgba(0,0,0,.85);
+  box-shadow: 0 14px 22px rgba(0,0,0,.35);
+}
+
+.factorPickHint{
+  margin-top: 6px;
+  font-weight: 900;
+  opacity: .9;
+}
+
+.factorPickBtns{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  flex-wrap:wrap;
+  margin-top: 14px;
+}
+
+</style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="center titleWrap">
+      <div class="title">MATMATİK</div>
+    </div>
+
+    <div class="side left" id="p1panel">
+      <h2 style="color:var(--p1)">1.OYUNCU</h2>
+      <div class="badge p1" id="badge1">
+        <div class="trophyInBadge">🏆</div>
+      </div>
+      <div id="star1" class="turnStar on">⭐</div>
+    </div>
+
+    <div class="center" id="gameRoot">
+      <div class="board">
+        <div id="grid" class="grid"></div>
+      </div>
+
+      <div class="factors">
+        <!-- BUTONLAR artık HUD’un ÜSTÜNDE -->
+        <div class="btns">
+          <button class="action" id="restartBtn">Baştan Başla</button>
+          <button class="action secondary" id="howBtn">Nasıl oynanır?</button>
+        </div>
+
+        <div class="hud">
+          <div class="pill">Sıra: <span id="turnText">1.Oyuncu</span></div>
+          <div class="pill">Seçim: <span id="selText">—</span></div>
+          <div class="pill">Hedef: <span id="prodText">—</span></div>
+        </div>
+
+        <div class="factorRow" id="row1" data-label="Üst satır"></div>
+		<div class="hintBar" id="hint"></div>
+        <div class="factorRow" id="row2" data-label="Alt satır"></div>
+      </div>
+    </div>
+
+    <div class="side right" id="p2panel">
+      <h2 style="color:var(--p2)">2.OYUNCU</h2>
+      <div class="badge p2" id="badge2">
+        <div class="trophyInBadge">🏆</div>
+      </div>
+      <div id="star2" class="turnStar">⭐</div>
+    </div>
+  </div>
+
+  <!-- NASIL OYNANIR -->
+  <div class="overlay" id="overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="howTitle">
+      <h3 id="howTitle">Nasıl oynanır?</h3>
+      <p>1) <b>1.Oyuncu</b> üst satırdan 1 sayı(Çarpan) ve alt satırdan 1 sayı(Çarpan) seçerek oyunu başlatır.</p>
+      <p>2) <b>Sonra sırası gelen oyuncu</b> istediği satırdan sadece <b>1 çarpanı değiştirerek</b> hamle yapar.</p>
+      <p>3) Her hamleden sonra çarpanların çarpımı tabloda boyanır.</p>
+      <p>4) Yatay, dikey ve çapraz olarak yan yana <b>kendi renginde 4 kare</b> yapan kazanır.</p>
+      <p class="note">Aynı kare tekrar seçilemez.</p>
+
+      <div class="closeRow">
+        <button class="action closeBtn" id="closeOverlayBtn">Kapat</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- OYUN BİTTİ -->
+<div class="gameOverOverlay" id="gameOver">
+  <div class="gameOverModal" role="dialog" aria-modal="true">
+    <div class="gameOverTitle" id="goTitle">Oyun Bitti</div>
+    <div class="gameOverWinner" id="goWinner">—</div>
+    <div class="bigTrophy" id="goTrophy">🏆</div>
+
+    <div class="gameOverQuestion">Yeni oyun başlatılsın mı?</div>
+
+    <div class="gameOverBtns">
+      <button class="action danger" id="goYes">Evet</button>
+      <button class="action ghost" id="goNo">Hayır</button>
+    </div>
+  </div>
+</div>
+
+
+  <!-- RESET ONAY -->
+  <div class="overlay" id="confirmReset">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+      <h3 id="resetTitle">Yeni oyun</h3>
+      <p>Yeni oyun başlatmak istediğinize emin misiniz?</p>
+
+      <div class="btnRow">
+        <button class="action danger" id="resetYesBtn">Evet</button>
+        <button class="action secondary" id="resetNoBtn">Hayır</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ÇARPAN SEÇİM ONAYI -->
+  <div class="factorPickOverlay" id="factorPick">
+    <div class="factorPickModal" role="dialog" aria-modal="true">
+      <div class="factorPickTitle" id="fpTitle">Seçimi Onayla</div>
+      <div class="factorBubble" id="fpBubble">0</div>
+      <div class="factorPickHint" id="fpHint">Bu sayıyı seçmek istiyor musun?</div>
+      <div class="factorPickBtns">
+        <button class="action danger" id="fpYes">Seç</button>
+        <button class="action ghost" id="fpNo">Vazgeç</button>
+      </div>
+    </div>
+  </div>
+
+
+<script>
+(() => {
+  const numbers = [
+    [ 1,  2,  3,  4,  5,  6],
+    [ 7,  8,  9, 10, 12, 14],
+    [15, 16, 18, 20, 21, 24],
+    [25, 27, 28, 30, 32, 35],
+    [36, 40, 42, 45, 48, 49],
+    [54, 56, 63, 64, 72, 81],
+  ];
+
+  const occ = Array.from({length:6}, () => Array(6).fill(0));
+  const $ = (id) => document.getElementById(id);
+  
+    
+
+  // --- Çarpan seçimi onayı (yanlış dokunmayı önler) ---
+  let pendingRow = null;
+  let pendingN = null;
+
+  function showFactorConfirm(row, n){
+    pendingRow = row;
+    pendingN = n;
+
+    $("fpBubble").textContent = String(n);
+    $("fpTitle").textContent = (row === "row1") ? "Üst çarpanı seç" : "Alt çarpanı seç";
+    $("factorPick").classList.add("show");
+  }
+
+  function hideFactorConfirm(){
+    $("factorPick").classList.remove("show");
+    pendingRow = null;
+    pendingN = null;
+  }
+function showGameOver(title, winnerText){
+    $("goTitle").textContent = title;
+    $("goWinner").textContent = winnerText;
+    $("gameOver").classList.add("show");
+  }
+  function hideGameOver(){
+    $("gameOver").classList.remove("show");
+  }
+
+  let turn = 1;
+  let a = 0;
+  let b = 0;
+  let prevA = 0, prevB = 0;
+  let locked = false;
+
+  function setHint(t){ $("hint").textContent = t || ""; }
+
+  function updateHUD(skipGuidance=false){
+    $("turnText").textContent = (turn === 1) ? "1.Oyuncu" : "2.Oyuncu";
+    $("selText").textContent = `${a || "—"} × ${b || "—"}`;
+    $("prodText").textContent = (a && b) ? (a*b) : "—";
+
+    $("star1").classList.toggle("on", turn === 1);
+    $("star2").classList.toggle("on", turn === 2);
+
+    if(!skipGuidance) updateGuidance();
+  }
+
+  function updateGuidance(){
+    if(locked){
+      setHint("Oyun bitti. Baştan Başla ile yeni oyuna geçebilirsiniz.");
+      return;
+    }
+
+    if(!a && !b){
+      setHint("1. Oyuncu: Üst satırdan 1 sayı ve alt satırdan 1 sayı seç.");
+      return;
+    }
+    if(a && !b){
+      setHint("Şimdi de alt satırdan 1 sayı seç.");
+      return;
+    }
+    if(!a && b){
+      setHint("Şimdi de üst satırdan 1 sayı seç.");
+      return;
+    }
+
+    if(turn === 1){
+      setHint("1. Oyuncu: Sadece sayılardan birini değiştirerek hamle yap.");
+    }else{
+      setHint("2. Oyuncu: Sadece sayılardan birini değiştirerek hamle yap.");
+    }
+  }
+
+  function renderBoard(){
+    const grid = $("grid");
+    grid.innerHTML = "";
+    for(let i=0;i<6;i++){
+      for(let j=0;j<6;j++){
+        const el = document.createElement("div");
+        el.className = "cell";
+        el.textContent = numbers[i][j];
+        if(occ[i][j] === 1) el.classList.add("p1");
+        if(occ[i][j] === 2) el.classList.add("p2");
+        grid.appendChild(el);
+      }
+    }
+  }
+
+  function renderFactors(){
+    const r1 = $("row1");
+    const r2 = $("row2");
+    r1.innerHTML = "";
+    r2.innerHTML = "";
+
+    for(let n=1;n<=9;n++){
+      const c1 = document.createElement("div");
+      c1.className = "circle";
+      c1.textContent = n;
+      if(a === n) c1.classList.add("sel");
+      c1.addEventListener("click", () => showFactorConfirm("row1", n));
+      r1.appendChild(c1);
+
+      const c2 = document.createElement("div");
+      c2.className = "circle";
+      c2.textContent = n;
+      if(b === n) c2.classList.add("sel");
+      c2.addEventListener("click", () => showFactorConfirm("row2", n));
+      r2.appendChild(c2);
+    }
+  }
+
+  function findCellByValue(v){
+    for(let i=0;i<6;i++){
+      for(let j=0;j<6;j++){
+        if(numbers[i][j] === v) return [i,j];
+      }
+    }
+    return null;
+  }
+
+  function revertPick(){
+    a = prevA;
+    b = prevB;
+    renderFactors();
+    updateHUD(true);
+  }
+
+  function pickFactor(row, n){
+    if(locked) return;
+
+    prevA = a;
+    prevB = b;
+
+    if(row === "row1") a = n;
+    else b = n;
+
+    renderFactors();
+    updateHUD();
+
+    tryPlay();
+  }
+
+  function has4InARow(player){
+    // yatay
+    for(let i=0;i<6;i++){
+      let run=0;
+      for(let j=0;j<6;j++){
+        run = (occ[i][j]===player) ? run+1 : 0;
+        if(run>=4) return true;
+      }
+    }
+    // dikey
+    for(let j=0;j<6;j++){
+      let run=0;
+      for(let i=0;i<6;i++){
+        run = (occ[i][j]===player) ? run+1 : 0;
+        if(run>=4) return true;
+      }
+    }
+    // çapraz (sol üst -> sağ alt)
+    for(let si=0; si<6; si++){
+      let i=0, j=si, run=0;
+      while(i<6 && j<6){
+        run = (occ[i][j]===player) ? run+1 : 0;
+        if(run>=4) return true;
+        i++; j++;
+      }
+      if(si>0){
+        i=si; j=0; run=0;
+        while(i<6 && j<6){
+          run = (occ[i][j]===player) ? run+1 : 0;
+          if(run>=4) return true;
+          i++; j++;
+        }
+      }
+    }
+    // çapraz (sağ üst -> sol alt)
+    for(let sj=0; sj<6; sj++){
+      let i=0, j=sj, run=0;
+      while(i<6 && j>=0){
+        run = (occ[i][j]===player) ? run+1 : 0;
+        if(run>=4) return true;
+        i++; j--;
+      }
+      if(sj<5){
+        i=(5-sj); j=5; run=0;
+        while(i<6 && j>=0){
+          run = (occ[i][j]===player) ? run+1 : 0;
+          if(run>=4) return true;
+          i++; j--;
+        }
+      }
+    }
+    return false;
+  }
+
+  function noMovesLeft(){
+    let exists = false;
+
+    for(let i=1;i<=9;i++){
+      const c1 = findCellByValue(i*b);
+      if(c1){
+        const [x,y]=c1;
+        if(occ[x][y]===0) exists = true;
+      }
+    }
+
+    for(let i=1;i<=9;i++){
+      const c2 = findCellByValue(a*i);
+      if(c2){
+        const [x,y]=c2;
+        if(occ[x][y]===0) exists = true;
+      }
+    }
+
+    return !exists;
+  }
+
+  function lockGame(){
+    locked = true;
+    $("gameRoot").classList.add("locked");
+    updateHUD();
+  }
+  function unlockGame(){
+    locked = false;
+    $("gameRoot").classList.remove("locked");
+    updateHUD();
+  }
+
+  function showWinner(p){
+    $("badge1").classList.remove("win");
+    $("badge2").classList.remove("win");
+
+    if(p === 1){
+      $("badge1").classList.add("win");
+      setHint("1.OYUNCU KAZANDI! 🏆  Baştan Başla ile yeni oyun.");
+      showGameOver("Oyun Bitti", "Kazanan: 1. Oyuncu");
+    }else if(p === 2){
+      $("badge2").classList.add("win");
+      setHint("2.OYUNCU KAZANDI! 🏆  Baştan Başla ile yeni oyun.");
+      showGameOver("Oyun Bitti", "Kazanan: 2. Oyuncu");
+    }else{
+      setHint("BERABERE BİTTİ. Baştan Başla ile yeni oyun.");
+      showGameOver("Oyun Bitti", "Sonuç: Berabere");
+    }
+  }
+
+
+  function nextTurn(){
+    turn = (turn===1) ? 2 : 1;
+    prevA = a; prevB = b;
+    updateHUD();
+    renderFactors();
+  }
+
+  function tryPlay(){
+    if(!a || !b) return;
+
+    const prod = a*b;
+    const cell = findCellByValue(prod);
+
+    const [i,j] = cell;
+
+    if(occ[i][j] !== 0){
+      setHint("Boyalı sayıyı tekrar seçemezsiniz, başka sayı seçiniz.");
+      revertPick();
+      return;
+    }
+
+    occ[i][j] = turn;
+    renderBoard();
+
+    if(has4InARow(turn)){
+      lockGame();
+      showWinner(turn);
+      return;
+    }
+
+    if(noMovesLeft()){
+      lockGame();
+      showWinner(0);
+      return;
+    }
+
+    nextTurn();
+  }
+
+  function resetGame(){
+	hideGameOver();
+    for(let i=0;i<6;i++) for(let j=0;j<6;j++) occ[i][j]=0;
+
+    turn = 1;
+    a = 0; b = 0;
+    prevA = 0; prevB = 0;
+
+    $("badge1").classList.remove("win");
+    $("badge2").classList.remove("win");
+
+    unlockGame();
+    renderBoard();
+    renderFactors();
+    updateHUD();
+  }
+
+  function showOverlay(){ $("overlay").classList.add("show"); }
+  function hideOverlay(){ $("overlay").classList.remove("show"); }
+
+  // RESET ONAY MODALI
+  const resetOverlay = $("confirmReset");
+  function showResetConfirm(){ resetOverlay.classList.add("show"); }
+  function hideResetConfirm(){ resetOverlay.classList.remove("show"); }
+
+  $("restartBtn").addEventListener("click", showResetConfirm);
+  $("resetYesBtn").addEventListener("click", () => {
+    hideResetConfirm();
+    resetGame();
+  });
+  $("resetNoBtn").addEventListener("click", hideResetConfirm);
+
+  resetOverlay.addEventListener("click", (e) => {
+    if(e.target === resetOverlay) hideResetConfirm();
+  });
+
+  $("howBtn").addEventListener("click", showOverlay);
+  $("closeOverlayBtn").addEventListener("click", hideOverlay);
+  $("overlay").addEventListener("click", (e) => {
+    if(e.target === $("overlay")) hideOverlay();
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if(e.key === "Escape"){
+      hideOverlay();
+      if(resetOverlay) resetOverlay.classList.remove("show");
+    }
+  });
+  
+    $("goYes").addEventListener("click", () => {
+    hideGameOver();
+    resetGame();
+  });
+
+  $("goNo").addEventListener("click", hideGameOver);
+
+  $("gameOver").addEventListener("click", (e) => {
+    if(e.target === $("gameOver")) hideGameOver();
+  });
+
+
+  // Çarpan onay paneli
+  $("fpYes").addEventListener("click", () => {
+    if(pendingRow && pendingN != null){
+      const r = pendingRow;
+      const n = pendingN;
+      hideFactorConfirm();
+      pickFactor(r, n);
+    }
+  });
+  $("fpNo").addEventListener("click", hideFactorConfirm);
+  $("factorPick").addEventListener("click", (e) => {
+    if(e.target === $("factorPick")) hideFactorConfirm();
+  });
+
+  resetGame();
+})();
+</script>
+</body>
+</html>
